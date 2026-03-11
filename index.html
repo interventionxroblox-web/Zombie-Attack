@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Mon jeu</title>
+
+<style>
+body{
+margin:0;
+overflow:hidden;
+}
+canvas{
+display:block;
+}
+</style>
+
+</head>
+<body>
+
+<canvas id="jeu"></canvas>
+
+<script>
+
+let canvas = document.getElementById("jeu");
+let ctx = canvas.getContext("2d");
+
+function resize(){
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+}
+
+window.addEventListener("resize", resize);
+resize();
+
+
+let etat = "menu";
+
+let niveau = 1;
+let maxNiveau = 5;
+
+let x = 400;
+let y = 300;
+
+let vitesse = 1.5;
+
+let sourisX = 0;
+let sourisY = 0;
+
+let vie = 100;
+let vieMax = 100;
+
+let ennemis = [];
+let balles = [];
+
+let boss = null;
+
+let spawnTimer = 0;
+let bossTimer = 0;
+
+let bossSpawnTime = 3600;
+
+let modeBoss = false;
+let bossMort = false;
+
+let mapWidth = 800;
+let mapHeight = 600;
+
+
+
+canvas.addEventListener("mousemove", e=>{
+let r=canvas.getBoundingClientRect();
+sourisX=e.clientX-r.left;
+sourisY=e.clientY-r.top;
+});
+
+
+canvas.addEventListener("click", ()=>{
+
+if(etat=="menu"){
+
+for(let i=0;i<maxNiveau;i++){
+
+let bx=canvas.width/2 -150 + (i*70);
+let by=canvas.height/2;
+
+if(
+sourisX>bx &&
+sourisX<bx+50 &&
+sourisY>by &&
+sourisY<by+50
+){
+
+niveau=i+1;
+startGame();
+
+}
+
+}
+
+return;
+}
+
+tirer();
+
+});
+
+
+document.addEventListener("keydown", e=>{
+
+if(etat!="jeu")return;
+
+if(e.key=="ArrowRight")x+=vitesse;
+if(e.key=="ArrowLeft")x-=vitesse;
+if(e.key=="ArrowUp")y-=vitesse;
+if(e.key=="ArrowDown")y+=vitesse;
+
+});
+
+
+function startGame(){
+
+etat="jeu";
+
+x = mapWidth/2;
+y = mapHeight/2;
+
+vie=100;
+
+ennemis=[];
+balles=[];
+boss=null;
+
+spawnTimer=0;
+bossTimer=0;
+
+modeBoss=false;
+bossMort=false;
+
+}
+
+
+function retourMenu(){
+
+etat="menu";
+
+ennemis=[];
+balles=[];
+boss=null;
+
+spawnTimer=0;
+bossTimer=0;
+
+modeBoss=false;
+bossMort=false;
+
+}
+
+
+function tirer(){
+
+let dx=sourisX-x;
+let dy=sourisY-y;
+
+let d=Math.sqrt(dx*dx+dy*dy);
+
+balles.push({
+x:x,
+y:y,
+vx:dx/d*5,
+vy:dy/d*5
+});
+
+}
+
+
+function spawnNormal(){
+
+if(ennemis.length>=10) return;
+
+ennemis.push({
+x:Math.random()*mapWidth,
+y:Math.random()*mapHeight,
+vitesse:1,
+cooldown:0
+});
+
+}
+
+
+function spawnBoss(){
+
+boss={
+x:100,
+y:100,
+vie:100,
+vieMax:100
+};
+
+modeBoss=true;
+ennemis=[];
+spawnTimer=0;
+
+}
+
+
+function collision(){
+
+for(let i=ennemis.length-1;i>=0;i--){
+
+let e=ennemis[i];
+
+if(e.cooldown>0) e.cooldown--;
+
+if(Math.abs(e.x-x)<20 && Math.abs(e.y-y)<20){
+
+if(e.cooldown<=0){
+
+vie-=5;
+e.cooldown=180;
+
+}
+
+}
+
+for(let j=balles.length-1;j>=0;j--){
+
+let b=balles[j];
+
+if(Math.abs(e.x-b.x)<15 && Math.abs(e.y-b.y)<15){
+
+ennemis.splice(i,1);
+balles.splice(j,1);
+
+break;
+
+}
+
+}
+
+}
+
+
+if(boss){
+
+let dx=x-boss.x;
+let dy=y-boss.y;
+
+let d=Math.sqrt(dx*dx+dy*dy);
+
+boss.x+=dx/d*0.6;
+boss.y+=dy/d*0.6;
+
+for(let j=balles.length-1;j>=0;j--){
+
+let b=balles[j];
+
+if(Math.abs(boss.x-b.x)<30){
+
+boss.vie-=5;
+balles.splice(j,1);
+
+}
+
+}
+
+if(boss.vie<=0){
+
+bossMort=true;
+
+}
+
+}
+
+
+if(vie<=0){
+
+retourMenu();
+
+}
+
+}
+
+
+function dessinerMiniMap(){
+
+let mx=canvas.width-120;
+let my=10;
+let mw=100;
+let mh=80;
+
+ctx.fillStyle="white";
+ctx.fillRect(mx,my,mw,mh);
+
+ctx.strokeRect(mx,my,mw,mh);
+
+ctx.fillStyle="red";
+
+ctx.fillRect(
+mx+(x/mapWidth)*mw,
+my+(y/mapHeight)*mh,
+4,4
+);
+
+ctx.fillStyle="green";
+
+for(let e of ennemis){
+
+ctx.fillRect(
+mx+(e.x/mapWidth)*mw,
+my+(e.y/mapHeight)*mh,
+3,3
+);
+
+}
+
+if(boss){
+
+ctx.fillStyle="purple";
+
+ctx.fillRect(
+mx+(boss.x/mapWidth)*mw,
+my+(boss.y/mapHeight)*mh,
+4,4
+);
+
+}
+
+}
+
+
+function dessinerBossVie(){
+
+if(!boss) return;
+
+ctx.fillStyle="black";
+ctx.fillRect(170,10,200,15);
+
+ctx.fillStyle="purple";
+ctx.fillRect(
+170,
+10,
+200*(boss.vie/boss.vieMax),
+15
+);
+
+}
+
+
+function dessinerMenu(){
+
+ctx.fillStyle="black";
+ctx.fillRect(0,0,canvas.width,canvas.height);
+
+ctx.fillStyle="white";
+ctx.font="40px Arial";
+ctx.fillText("CHOIX DU NIVEAU",canvas.width/2-180,150);
+
+for(let i=0;i<maxNiveau;i++){
+
+let bx=canvas.width/2 -150 + (i*70);
+let by=canvas.height/2;
+
+ctx.fillStyle="gray";
+ctx.fillRect(bx,by,50,50);
+
+ctx.fillStyle="black";
+ctx.font="20px Arial";
+ctx.fillText(i+1,bx+18,by+32);
+
+}
+
+}
+
+
+function dessinerJeu(){
+
+ctx.fillStyle="#3cb043";
+ctx.fillRect(0,0,canvas.width,canvas.height);
+
+
+// joueur
+
+ctx.fillStyle="blue";
+ctx.fillRect(x-5,y,10,15);
+
+ctx.beginPath();
+ctx.fillStyle="peachpuff";
+ctx.arc(x,y-5,5,0,Math.PI*2);
+ctx.fill();
+
+
+// zombies avec tete
+
+for(let e of ennemis){
+
+ctx.fillStyle="green";
+ctx.fillRect(e.x-5,e.y,10,12);
+
+ctx.beginPath();
+ctx.fillStyle="lightgreen";
+ctx.arc(e.x,e.y-5,5,0,Math.PI*2);
+ctx.fill();
+
+}
+
+
+// boss
+
+if(boss){
+
+ctx.fillStyle="purple";
+ctx.fillRect(boss.x-10,boss.y,20,20);
+
+ctx.beginPath();
+ctx.fillStyle="violet";
+ctx.arc(boss.x,boss.y-10,8,0,Math.PI*2);
+ctx.fill();
+
+}
+
+
+// balles
+
+for(let b of balles){
+
+ctx.fillStyle="black";
+ctx.beginPath();
+ctx.arc(b.x,b.y,3,0,Math.PI*2);
+ctx.fill();
+
+}
+
+
+// vie
+
+ctx.fillStyle="black";
+ctx.fillRect(10,10,150,15);
+
+ctx.fillStyle="red";
+ctx.fillRect(10,10,150*(vie/vieMax),15);
+
+
+dessinerBossVie();
+
+
+if(!boss){
+
+let t=Math.floor((bossSpawnTime-bossTimer)/60);
+ctx.fillText("Boss "+t,10,70);
+
+}
+
+ctx.fillText("Niv "+niveau,10,90);
+
+dessinerMiniMap();
+
+}
+
+
+function boucle(){
+
+if(etat=="menu"){
+dessinerMenu();
+requestAnimationFrame(boucle);
+return;
+}
+
+
+if(bossMort){
+
+retourMenu();
+requestAnimationFrame(boucle);
+return;
+
+}
+
+
+spawnTimer++;
+bossTimer++;
+
+
+if(spawnTimer>60){
+spawnNormal();
+spawnTimer=0;
+}
+
+
+if(bossTimer>bossSpawnTime && !boss){
+spawnBoss();
+bossTimer=0;
+}
+
+
+for(let e of ennemis){
+
+let dx=x-e.x;
+let dy=y-e.y;
+
+let d=Math.sqrt(dx*dx+dy*dy);
+
+e.x+=dx/d*e.vitesse;
+e.y+=dy/d*e.vitesse;
+
+}
+
+
+for(let b of balles){
+b.x+=b.vx;
+b.y+=b.vy;
+}
+
+
+collision();
+
+dessinerJeu();
+
+requestAnimationFrame(boucle);
+
+}
+
+boucle();
+
+</script>
+</body>
+</html>
